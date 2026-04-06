@@ -1,121 +1,131 @@
-import swisseph as swe
+import ephem
+import math
 from datetime import datetime
-
-swe.set_ephe_path('/usr/share/ephe')
-
-PLANETS = {
-    '太陽': swe.SUN, '月': swe.MOON, '水星': swe.MERCURY,
-    '金星': swe.VENUS, '火星': swe.MARS, '木星': swe.JUPITER,
-    '土星': swe.SATURN, '天王星': swe.URANUS, '海王星': swe.NEPTUNE,
-    '冥王星': swe.PLUTO
-}
 
 SIGNS = ['牡羊座','牡牛座','双子座','蟹座','獅子座','乙女座',
          '天秤座','蠍座','射手座','山羊座','水瓶座','魚座']
 
-SIGNS_EN = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo',
-            'Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
-
 ASPECTS = [
-    {'name': 'コンジャンクション', 'angle': 0, 'orb': 8, 'symbol': '☌'},
-    {'name': 'セクスタイル', 'angle': 60, 'orb': 6, 'symbol': '⚹'},
-    {'name': 'スクエア', 'angle': 90, 'orb': 8, 'symbol': '□'},
-    {'name': 'トライン', 'angle': 120, 'orb': 8, 'symbol': '△'},
-    {'name': 'オポジション', 'angle': 180, 'orb': 8, 'symbol': '☍'},
+    {'name': 'コンジャンクション', 'angle': 0,   'orb': 8, 'symbol': '☌'},
+    {'name': 'セクスタイル',       'angle': 60,  'orb': 6, 'symbol': '⚹'},
+    {'name': 'スクエア',           'angle': 90,  'orb': 8, 'symbol': '□'},
+    {'name': 'トライン',           'angle': 120, 'orb': 8, 'symbol': '△'},
+    {'name': 'オポジション',       'angle': 180, 'orb': 8, 'symbol': '☍'},
 ]
 
-def get_sign(lon):
-    return SIGNS[int(lon / 30)]
-
-def get_degree(lon):
-    return lon % 30
-
-def get_house(lon, houses):
-    for i in range(11, -1, -1):
-        if lon >= houses[i] % 360 or (i == 0 and lon < houses[11] % 360):
-            return i + 1
-    return 1
-
+def get_sign(lon): return SIGNS[int(lon / 30) % 12]
+def get_degree(lon): return lon % 30
 def get_sabian_degree(lon):
-    """サビアン度数（1〜360）を返す"""
-    deg = int(lon % 30) + 1
-    sign_index = int(lon / 30)
-    return sign_index * 30 + deg
+    return int(lon / 30) % 12 * 30 + int(lon % 30) + 1
+
+def to_ecl_lon(body):
+    ra = float(body.a_ra)
+    dec = float(body.a_dec)
+    epsilon = math.radians(23.4393)
+    x = math.cos(dec) * math.cos(ra)
+    y = math.cos(dec) * math.sin(ra)
+    z = math.sin(dec)
+    ye = y * math.cos(epsilon) + z * math.sin(epsilon)
+    return math.degrees(math.atan2(ye, x)) % 360
+
+def calc_houses(jd, lat, lng):
+    theta0 = (280.46061837 + 360.98564736629 * (jd - 2451545.0)) % 360
+    LST = (theta0 + lng) % 360
+    epsilon = math.radians(23.4393)
+    LST_rad = math.radians(LST)
+    lat_rad = math.radians(lat)
+    asc = math.degrees(math.atan2(
+        math.cos(LST_rad),
+        -(math.sin(LST_rad) * math.cos(epsilon) + math.tan(lat_rad) * math.sin(epsilon))
+    )) % 360
+    mc_y = math.sin(LST_rad) * math.cos(epsilon) - math.tan(lat_rad) * math.sin(epsilon)
+    mc = math.degrees(math.atan2(mc_y, -math.cos(LST_rad))) % 360
+    if math.sin(LST_rad) > 0:
+        mc = (mc + 180) % 360
+    cusps = [(asc + i * 30) % 360 for i in range(12)]
+    return cusps, asc, mc
+
+def get_house(lon, cusps):
+    lon = lon % 360
+    for i in range(12):
+        next_i = (i + 1) % 12
+        start = cusps[i] % 360
+        end = cusps[next_i] % 360
+        if start <= end:
+            if start <= lon < end:
+                return i + 1
+        else:
+            if lon >= start or lon < end:
+                return i + 1
+    return 1
 
 def calc_aspect_angle(a, b):
     diff = abs(a - b) % 360
-    if diff > 180:
-        diff = 360 - diff
-    return diff
+    return 360 - diff if diff > 180 else diff
 
 def calculate_chart(birth_date, birth_time, lat, lng):
     dt = datetime.combine(birth_date, birth_time)
-    # UTCに変換（簡易：日本時間 -9時間）
-    jd = swe.julday(dt.year, dt.month, dt.day, dt.hour - 9 + dt.minute/60)
+    utc_h = dt.hour - 9 + dt.minute / 60.0
+    ephem_date = f"{dt.year}/{dt.month}/{dt.day} {int(utc_h % 24):02d}:{dt.minute:02d}:00"
 
-    houses, ascmc = swe.houses(jd, lat, lng, b'P')
+    obs = ephem.Observer()
+    obs.lat = str(lat); obs.lon = str(lng)
+    obs.date = ephem_date; obs.epoch = ephem.J2000; obs.pressure = 0
 
-    planets = []
-    planet_positions = {}
+    jd = float(ephem.julian_date(obs.date))
+    cusps, asc_lon, mc_lon = calc_houses(jd, lat, lng)
 
-    for name, planet_id in PLANETS.items():
-        pos, _ = swe.calc_ut(jd, planet_id)
-        lon = pos[0]
-        sign = get_sign(lon)
-        degree = get_degree(lon)
-        house = get_house(lon, houses)
-        sabian = get_sabian_degree(lon)
+    bodies = {'太陽': ephem.Sun(), '月': ephem.Moon(), '水星': ephem.Mercury(),
+              '金星': ephem.Venus(), '火星': ephem.Mars(), '木星': ephem.Jupiter(),
+              '土星': ephem.Saturn(), '天王星': ephem.Uranus(),
+              '海王星': ephem.Neptune(), '冥王星': ephem.Pluto()}
 
-        planet_data = {
-            'name': name,
-            'sign': sign,
-            'degree': round(degree, 1),
-            'house': house,
+    planets_data = []
+    positions = {}
+
+    for name, body in bodies.items():
+        body.compute(obs)
+        lon = to_ecl_lon(body)
+        planets_data.append({
+            'name': name, 'sign': get_sign(lon),
+            'degree': round(get_degree(lon), 1),
+            'house': get_house(lon, cusps),
             'longitude': round(lon, 2),
-            'sabian_degree': sabian,
-            'retrograde': pos[3] < 0
-        }
-        planets.append(planet_data)
-        planet_positions[name] = lon
+            'sabian_degree': get_sabian_degree(lon),
+            'retrograde': False
+        })
+        positions[name] = lon
 
-    # ASC・MC追加
-    for name, lon in [('ASC', ascmc[0]), ('MC', ascmc[1])]:
-        planets.append({
-            'name': name,
-            'sign': get_sign(lon),
+    for name, lon in [('ASC', asc_lon), ('MC', mc_lon)]:
+        planets_data.append({
+            'name': name, 'sign': get_sign(lon),
             'degree': round(get_degree(lon), 1),
             'house': 1 if name == 'ASC' else 10,
             'longitude': round(lon, 2),
             'sabian_degree': get_sabian_degree(lon),
             'retrograde': False
         })
-        planet_positions[name] = lon
+        positions[name] = lon
 
-    # アスペクト計算
     aspects = []
-    planet_names = list(planet_positions.keys())
-    for i in range(len(planet_names)):
-        for j in range(i+1, len(planet_names)):
-            p1, p2 = planet_names[i], planet_names[j]
-            angle = calc_aspect_angle(planet_positions[p1], planet_positions[p2])
+    names = list(positions.keys())
+    for i in range(len(names)):
+        for j in range(i+1, len(names)):
+            p1, p2 = names[i], names[j]
+            angle = calc_aspect_angle(positions[p1], positions[p2])
             for asp in ASPECTS:
                 if abs(angle - asp['angle']) <= asp['orb']:
                     aspects.append({
-                        'planet1': p1,
-                        'planet2': p2,
-                        'aspect': asp['name'],
-                        'symbol': asp['symbol'],
+                        'planet1': p1, 'planet2': p2,
+                        'aspect': asp['name'], 'symbol': asp['symbol'],
                         'angle': round(angle, 1),
                         'orb': round(abs(angle - asp['angle']), 1)
                     })
 
-    house_data = [{'number': i+1, 'sign': get_sign(h), 'degree': round(get_degree(h), 1)}
-                  for i, h in enumerate(houses)]
-
     return {
-        'planets': planets,
-        'aspects': aspects,
-        'houses': house_data,
-        'asc': {'sign': get_sign(ascmc[0]), 'degree': round(get_degree(ascmc[0]), 1)},
-        'mc': {'sign': get_sign(ascmc[1]), 'degree': round(get_degree(ascmc[1]), 1)},
+        'planets': planets_data, 'aspects': aspects,
+        'houses': [{'number': i+1, 'sign': get_sign(c), 'degree': round(get_degree(c), 1)}
+                   for i, c in enumerate(cusps)],
+        'asc': {'sign': get_sign(asc_lon), 'degree': round(get_degree(asc_lon), 1)},
+        'mc': {'sign': get_sign(mc_lon), 'degree': round(get_degree(mc_lon), 1)},
     }
