@@ -1,2 +1,5 @@
 [phases.setup]
-nixPkgs = ["sqlite", "libffi"]
+nixPkgs = ["sqlite", "libffi", "stdenv.cc.cc.lib", "zlib"]
+
+[phases.build]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
