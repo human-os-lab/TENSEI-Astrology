@@ -1,6 +1,5 @@
 from fastapi import FastAPI, Request, Form
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from datetime import date, time
 from geopy.geocoders import Nominatim
@@ -8,7 +7,7 @@ from services.astro import calculate_chart
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
-app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 geolocator = Nominatim(user_agent="etsuko-astro-app")
 
