@@ -61,7 +61,7 @@ async def calculate(
         "birth_date": birth_date,
         "birth_time": birth_time,
         "birth_place": birth_place,
-        "location_name": location.address,
+        "location_name": location_name,
         "lat": round(lat, 4),
         "lng": round(lng, 4),
         "chart": chart,
