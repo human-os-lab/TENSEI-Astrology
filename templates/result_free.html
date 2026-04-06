@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鑑定結果 | えつこ鑑定</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Hiragino Mincho ProN', 'Yu Mincho', serif;
+    background: #0a0a1a;
+    color: #e8e0d0;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 40px; }
+  .header .symbol { font-size: 36px; display: block; margin-bottom: 12px; }
+  h1 { font-size: 22px; font-weight: normal; letter-spacing: 0.2em; color: #c9b882; }
+  .birth-info {
+    text-align: center;
+    font-size: 14px;
+    color: #8880a0;
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  .section {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(201,184,130,0.15);
+    border-radius: 12px;
+    padding: 28px;
+    margin-bottom: 24px;
+  }
+  h2 {
+    font-size: 14px;
+    letter-spacing: 0.2em;
+    color: #c9b882;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(201,184,130,0.2);
+  }
+
+  /* 惑星テーブル */
+  .planet-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+  }
+  .planet-card {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(201,184,130,0.1);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .planet-name {
+    font-size: 13px;
+    color: #c9b882;
+    margin-bottom: 4px;
+    letter-spacing: 0.1em;
+  }
+  .planet-position {
+    font-size: 15px;
+    color: #e8e0d0;
+  }
+  .planet-meta {
+    font-size: 11px;
+    color: #6660a0;
+    margin-top: 4px;
+  }
+  .retrograde { color: #c08080; font-size: 11px; }
+
+  /* アスペクト */
+  .aspect-list { display: flex; flex-direction: column; gap: 8px; }
+  .aspect-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 14px;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 6px;
+  }
+  .aspect-symbol { font-size: 18px; width: 24px; text-align: center; }
+  .aspect-name { color: #c9b882; font-size: 12px; min-width: 120px; }
+  .aspect-planets { color: #e8e0d0; }
+  .aspect-orb { color: #6660a0; font-size: 11px; margin-left: auto; }
+
+  /* 課金CTA */
+  .cta {
+    background: linear-gradient(135deg, rgba(201,184,130,0.1), rgba(160,128,64,0.05));
+    border: 1px solid rgba(201,184,130,0.4);
+    border-radius: 16px;
+    padding: 40px;
+    text-align: center;
+    margin-top: 32px;
+  }
+  .cta-symbol { font-size: 32px; display: block; margin-bottom: 16px; }
+  .cta h2 {
+    font-size: 18px;
+    color: #c9b882;
+    border: none;
+    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+  }
+  .cta p {
+    font-size: 14px;
+    color: #8880a0;
+    line-height: 1.8;
+    margin-bottom: 24px;
+  }
+  .cta-btn {
+    display: inline-block;
+    padding: 16px 40px;
+    background: linear-gradient(135deg, #c9b882, #a08040);
+    border-radius: 8px;
+    color: #0a0a1a;
+    font-size: 15px;
+    font-family: inherit;
+    letter-spacing: 0.2em;
+    text-decoration: none;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.3s;
+  }
+  .cta-btn:hover { opacity: 0.85; }
+
+  .back-link {
+    text-align: center;
+    margin-top: 24px;
+  }
+  .back-link a {
+    color: #6660a0;
+    font-size: 13px;
+    text-decoration: none;
+    letter-spacing: 0.1em;
+  }
+  .back-link a:hover { color: #c9b882; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <span class="symbol">✦</span>
+    <h1>あなたのホロスコープ</h1>
+    <p class="birth-info">
+      {{ birth_date }} {{ birth_time }} ／ {{ birth_place }}
+    </p>
+  </div>
+
+  <!-- 惑星配置 -->
+  <div class="section">
+    <h2>✦ 惑星配置</h2>
+    <div class="planet-grid">
+      {% for p in chart.planets %}
+      <div class="planet-card">
+        <div class="planet-name">{{ p.name }}</div>
+        <div class="planet-position">{{ p.sign }} {{ p.degree }}°</div>
+        <div class="planet-meta">
+          第{{ p.house }}ハウス
+          {% if p.retrograde %}<span class="retrograde">　逆行中</span>{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- アスペクト -->
+  <div class="section">
+    <h2>✦ アスペクト（惑星間の角度）</h2>
+    {% if chart.aspects %}
+    <div class="aspect-list">
+      {% for a in chart.aspects %}
+      <div class="aspect-item">
+        <span class="aspect-symbol">{{ a.symbol }}</span>
+        <span class="aspect-name">{{ a.aspect }}</span>
+        <span class="aspect-planets">{{ a.planet1 }} — {{ a.planet2 }}</span>
+        <span class="aspect-orb">orb {{ a.orb }}°</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p style="color:#6660a0;font-size:14px;">主要アスペクトは検出されませんでした。</p>
+    {% endif %}
+  </div>
+
+  <!-- ハウス -->
+  <div class="section">
+    <h2>✦ ハウスカスプ</h2>
+    <div class="planet-grid">
+      {% for h in chart.houses %}
+      <div class="planet-card">
+        <div class="planet-name">第{{ h.number }}ハウス</div>
+        <div class="planet-position">{{ h.sign }} {{ h.degree }}°</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <span class="cta-symbol">🔮</span>
+    <h2>さらに深く、あなたの設計図を読む</h2>
+    <p>
+      サビアンシンボルはあなたの各惑星が持つ<br>
+      象徴的な核心を映し出します。<br>
+      「なぜ自分はこうなのか」が腑に落ちる鑑定を届けます。
+    </p>
+    <button class="cta-btn">サビアン詳細鑑定を見る（準備中）</button>
+  </div>
+
+  <div class="back-link">
+    <a href="/">← 入力に戻る</a>
+  </div>
+</div>
+</body>
+</html>
