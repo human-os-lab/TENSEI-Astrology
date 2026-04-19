@@ -1,5 +1,8 @@
 import os
+import logging
 import anthropic
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """## 役割
 西洋占星術と脳科学を融合した鑑定AIです。
@@ -26,6 +29,7 @@ SYSTEM_PROMPT = """## 役割
 def generate_free_reading(chart: dict) -> str | None:
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     if not api_key:
+        logger.warning("ANTHROPIC_API_KEY が設定されていません")
         return None
 
     planets = {p["name"]: p for p in chart["planets"]}
@@ -57,5 +61,6 @@ def generate_free_reading(chart: dict) -> str | None:
             messages=[{"role": "user", "content": prompt}],
         )
         return message.content[0].text.strip()
-    except Exception:
+    except Exception as e:
+        logger.error(f"Claude API エラー: {e}")
         return None

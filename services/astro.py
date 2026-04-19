@@ -42,7 +42,20 @@ def calc_houses(jd, lat, lng):
     mc = math.degrees(math.atan2(mc_y, -math.cos(LST_rad))) % 360
     if math.sin(LST_rad) > 0:
         mc = (mc + 180) % 360
-    cusps = [(asc + i * 30) % 360 for i in range(12)]
+    # Porphyry ハウスシステム：ASC/IC/DSC/MCの4象限をそれぞれ3等分
+    ic = (mc + 180) % 360
+    dsc = (asc + 180) % 360
+
+    def trisect(start, end):
+        arc = (end - start) % 360
+        return [(start + arc / 3) % 360, (start + 2 * arc / 3) % 360]
+
+    h2, h3 = trisect(asc, ic)
+    h5, h6 = trisect(ic, dsc)
+    h8, h9 = trisect(dsc, mc)
+    h11, h12 = trisect(mc, asc)
+
+    cusps = [asc, h2, h3, ic, h5, h6, dsc, h8, h9, mc, h11, h12]
     return cusps, asc, mc
 
 def get_house(lon, cusps):
