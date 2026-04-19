@@ -4,6 +4,7 @@ from fastapi.responses import HTMLResponse
 from datetime import date, time
 from geopy.geocoders import Nominatim
 from services.astro import calculate_chart
+from services.claude import generate_free_reading
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -55,6 +56,7 @@ async def calculate(
     location_name = location_name or birth_place
 
     chart = calculate_chart(birth_date, birth_time, lat, lng)
+    reading = generate_free_reading(chart)
 
     return templates.TemplateResponse("result_free.html", {
         "request": request,
@@ -65,4 +67,5 @@ async def calculate(
         "lat": round(lat, 4),
         "lng": round(lng, 4),
         "chart": chart,
+        "reading": reading,
     })
