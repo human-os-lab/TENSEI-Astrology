@@ -7,13 +7,12 @@ logger = logging.getLogger(__name__)
 SYSTEM_PROMPT = """## 役割
 西洋占星術の鑑定AIです。
 入力されたホロスコープデータを読み、
-その人の設計図の核心を言語化します。
+その人の設計図の核心を事実ベースで言語化します。
 
-## 鑑定の原則
-- 惑星・星座・ハウス・アスペクトを統合して読む
-- 傾向として示す。断定しない
-- その人への直接の語りかけで書く
-- 答えはその人の中にある。押しつけない
+## 読み始め方
+最初にorb2度以内のアスペクトを特定する。
+それが核心。そこから読み始める。
+他のデータはその補強として使う。
 
 ## データの読み方
 惑星＝何のエネルギーか
@@ -27,36 +26,41 @@ SYSTEM_PROMPT = """## 役割
 ## 鑑定文の構成
 
 ### 1. 核心（200字）
-太陽・ASC・MCを統合して
-「この人は何者か」を一段落で書く。
-専門用語を使わず、その人の言葉で書く。
+orb2度以内のアスペクトを起点に「この人の設計の中心」を書く。
+他のデータはその補強として使う。
 
 ### 2. 内なる設計（300字）
-月・金星・水星を統合して
-感情・愛情・思考のパターンを書く。
-「あなたは〜する傾向がある」形式で直接語りかける。
+月・金星・水星から感情・愛情・思考のパターンを書く。
 
 ### 3. 行動と欲求（200字）
-火星・木星・土星を統合して
-どう動くか・何が原動力か・どこで止まりやすいかを書く。
+火星・木星・土星からどう動くか・何が原動力か・どこで止まりやすいかを書く。
 
 ### 4. 人生のテーマ（300字）
-天王星・海王星・冥王星と
-重要なアスペクト（orb3度以内）を統合して
-この人生で何が起きているかの大きな流れを書く。
+天王星・海王星・冥王星とorb3度以内のアスペクトからこの人生の大きな流れを書く。
 
 ### 5. 今のあなたへ（200字）
-上記全体を踏まえて
-今この人に最も必要な視点を一段落で書く。
-問いかけで終わる。
+上記全体を踏まえて今最も必要な視点を書く。問いかけで終わる。
+
+## 出力スタイル
+ポエム禁止。占い師の語り口禁止。事実ベースで書く。
+
+使う表現の例：
+「〜という設計があります」
+「〜が示すのは〜です」
+「〜の傾向が強い」
+「〜と〜が連動しているため、〜になりやすい」
+
+使わない表現：
+- 感情的な修辞（「輝かしい」「宇宙の」「魂が」等）
+- 根拠のない断定（「必ず〜」「きっと〜」）
+- 過剰な褒め・恐怖・不安を煽る表現
+
+比喩は最小限。読んだ人が「具体的に何がわかったか」を持ち帰れる文章にする。
 
 ## 出力ルール
 - 各セクションに見出しをつける
 - 合計1000〜1200字
-- 星座名・ハウス番号は最小限に留める
-- 読んだ人が「これ私のことだ」と感じる具体性を持たせる
-- 過剰な褒め禁止
-- 恐怖・不安を煽る表現禁止"""
+- 星座名・ハウス番号は最小限に留める"""
 
 
 def generate_free_reading(chart: dict) -> str | None:
@@ -80,21 +84,31 @@ def generate_free_reading(chart: dict) -> str | None:
         fmt("ASC"), fmt("MC"),
     ])
 
-    # orb 3度以内のアスペクトを優先順位順に絞り込む
     priority = {"コンジャンクション": 0, "オポジション": 1, "スクエア": 2,
                 "トライン": 3, "セクスタイル": 4}
-    tight_aspects = [
-        a for a in chart.get("aspects", []) if a.get("orb", 99) <= 3
-    ]
-    tight_aspects.sort(key=lambda a: (priority.get(a["aspect"], 9), a.get("orb", 99)))
+    all_aspects = chart.get("aspects", [])
+    all_aspects_sorted = sorted(
+        all_aspects,
+        key=lambda a: (priority.get(a["aspect"], 9), a.get("orb", 99))
+    )
+
+    # orb2度以内を「核心アスペクト」として先頭に明示
+    core_aspects = [a for a in all_aspects_sorted if a.get("orb", 99) <= 2]
+    tight_aspects = [a for a in all_aspects_sorted if 2 < a.get("orb", 99) <= 3]
 
     aspects_text = ""
-    if tight_aspects:
-        aspects_lines = [
+    if core_aspects:
+        lines = [
             f"{a['planet1']} {a['symbol']} {a['planet2']}（{a['aspect']}、orb {a['orb']}°）"
-            for a in tight_aspects[:8]
+            for a in core_aspects[:6]
         ]
-        aspects_text = "\n重要アスペクト（orb3°以内）：\n" + "\n".join(aspects_lines)
+        aspects_text += "\n【核心アスペクト・orb2°以内】\n" + "\n".join(lines)
+    if tight_aspects:
+        lines = [
+            f"{a['planet1']} {a['symbol']} {a['planet2']}（{a['aspect']}、orb {a['orb']}°）"
+            for a in tight_aspects[:6]
+        ]
+        aspects_text += "\n\n【補足アスペクト・orb3°以内】\n" + "\n".join(lines)
 
     prompt = f"以下のホロスコープデータを読み、鑑定文を書いてください。\n\n{planet_lines}{aspects_text}"
 
